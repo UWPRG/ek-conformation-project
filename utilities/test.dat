@@ -1,0 +1,5 @@
+en: ENERGY
+
+
+#make STRIDE = to your exchange attempt frequency!!!
+PRINT FILE=COLVAR ARG=* STRIDE=250

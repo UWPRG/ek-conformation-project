@@ -1,0 +1,66 @@
+;
+;	GROMACS
+;       NPT Input File
+;
+;define                 =
+integrator              = md
+nsteps                  = -1 ; 2 ns total
+nstcalcenergy           = 1
+dt                      = 0.002 ; picoseconds
+;
+; Removing CM Translation and Rotation
+comm_mode               = Linear
+nstcomm                 = 1000
+;
+; Output Control
+nstlog                  = 10000
+nstenergy               = 1000
+nstxout                 = 10000
+nstxtcout               = 1000
+nstvout                 = 0
+nstfout                 = 0
+;
+; Group Definition
+xtc-precision           = 5000
+xtc-grps                = Protein
+;
+; Neighbour Searching
+nstlist                 = 10
+ns_type                 = grid
+pbc                     = xyz 
+rlist                   = 1.0
+;
+; Electrostatic
+rcoulomb                = 1.0
+coulombtype             = PME 
+;rcoulomb_switch         = 1.0 
+;fourierspacing         = 0.12
+;periodic_molecules     = yes 
+;
+; Van der Waals
+vdw-type                = Cut-off
+vdw_modifier            = Force-switch
+rvdw                    = 1.0
+rvdw-switch             = 0.9
+;
+cutoff-scheme = Verlet
+;
+; Temperature
+Tcoupl                  = v-rescale 
+tc_grps                 = system 
+tau_t                   = 0.1 
+ref_t                   = XXX
+;
+; Initial Velocities
+;continuation            = yes
+;gen_vel                 = yes
+gen_temp                = XXX
+gen_seed                = -1
+;
+;Constraints
+constraints             = all-bonds
+constraint-algorithm    = lincs
+lincs_iter              = 4
+;
+; Pressure
+Pcoupl                  = no

@@ -1,0 +1,10 @@
+# pycharm
+.idea/
+__pycache__/
+
+# virtualenv
+.env/
+
+# macOS
+.DS_Store
+
