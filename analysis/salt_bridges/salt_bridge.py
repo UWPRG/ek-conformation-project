@@ -42,7 +42,6 @@ for temp_idx, temp in enumerate(temps):
     traj = traj[np.where(traj.time >= time_range[0])]
     traj = traj[np.where(traj.time < time_range[1])]
 
-
     #########################
     # load rewieghting bias #
     #########################
