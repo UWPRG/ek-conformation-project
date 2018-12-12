@@ -14,22 +14,26 @@ from utilities import read_plumed_file, reweight_ct
 #############
 
 # simulation files to read
+sequences = [
+    'EK', 'EKG', 'EKGG', 'EGKG', 'EKGGG', 'GG',
+]
 temps = [
     300.000, 311.264, 322.952, 335.078, 347.660, 360.714,
     374.258, 388.311, 402.891, 418.019, 433.715, 450.000
 ]
 temp_idx = 0
-pdb = '/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/EKGG.pdb'
-xtc = f'/Volumes/UntitledUnmastered/EK_proj/EKGG/MetaD/centered_{temp_idx}.xtc'
+seq_idx = 0
+pdb = f'/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/{sequences[seq_idx]}.pdb'
+xtc = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/MetaD/centered_{temp_idx}.xtc'
 # ct file
-ct_file = f'/Volumes/UntitledUnmastered/EK_proj/EKGG/' \
+ct_file = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/' \
           f'driver/Reweighting/temp{temp_idx}/COLVARdriver'
 
 time_range = (0, 300000)  # ps
 
 
 # load low temp traj and restrict frames to time range of interest
-traj = md.load(xtc, top=pdb, stride=100)
+traj = md.load(xtc, top=pdb, stride=50)
 traj = traj[np.where(traj.time >= time_range[0])]
 traj = traj[np.where(traj.time < time_range[1])]
 
@@ -84,12 +88,14 @@ def gromos(rmsd_matrix, cutoff):
     """
     rmsd_matrix = np.copy(rmsd_matrix)
     clust_ids = np.zeros(rmsd_matrix.shape[0])
+    central_structures = [None]
 
     clust_idx = 1
     while not np.all(np.isnan(rmsd_matrix)):
         # identify structure with the most neighbors
         neighbor_matrix = (rmsd_matrix < cutoff)
         most_neighborly_cluster = np.argmax(neighbor_matrix.sum(axis=0))
+        central_structures.append(most_neighborly_cluster)
         new_cluster_member_ids = np.where(neighbor_matrix[most_neighborly_cluster])[0]
         # stop clustering once there are no clusters greater than 1 structure in size
         if len(new_cluster_member_ids) == 1:
@@ -101,17 +107,23 @@ def gromos(rmsd_matrix, cutoff):
         rmsd_matrix[:, new_cluster_member_ids] = np.nan
         clust_idx += 1
 
-    return clust_ids
+    return clust_ids, central_structures
 
+
+clust_ids, central_structures = gromos(distances, 0.6)
 
 clust_ids = pd.Series(
-    gromos(distances, 0.6),
+    clust_ids,
     index=traj.time,
 )
 
 frame_weights['clust_id'] = clust_ids
-
 clust_wts = frame_weights.groupby(['clust_id'])[['norm_wt']].sum()
+top_three = clust_wts.sort_values(['norm_wt'], ascending=False).index[:3]
 
+for clust in top_three:
+    frame = central_structures[int(clust)]
+    if frame is not None:
+        traj[frame].save_pdb(f'clust{int(clust)}.pdb')
 
 print('lol')
