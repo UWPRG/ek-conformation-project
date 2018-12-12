@@ -1,0 +1,3 @@
+salt_bridges hydrophilic_sasa h_std total_sasa t_std  frxn_hydrophilic f_std
+0 11.089238 2.3312337 22.953764 4.174667 0.48045298 0.018212512
+# reweighted avg hydrophilic_sasa 8.27347555052521
