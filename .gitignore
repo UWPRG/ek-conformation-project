@@ -10,3 +10,7 @@ __pycache__/
 
 # jupyter
 .ipynb_checkpoints/
+
+# data and temporary analysis files
+practice_data/
+*.pdb
