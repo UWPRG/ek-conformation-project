@@ -1,4 +1,5 @@
 import itertools
+import os.path as op
 import numpy as np
 import pandas as pd
 import mdtraj as md
@@ -7,6 +8,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append("..")
 from utilities import read_plumed_file, reweight_ct
+from structure import calculate_contacts, do_dssp
 
 #############
 # load traj #
@@ -25,17 +27,20 @@ temps = [
 # seq_idx = 4
 # temp_idx = 0
 
+pdb_dir = '/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/'
+# xtc_dir = '/Volumes/UntitledUnmastered/EK_proj/'
+xtc_dir = '/Users/joshsmith/Git/ek-conformation-project/analysis/practice_data/'
+plumed_dir = '/Users/joshsmith/Git/ek-conformation-project/analysis/practice_data/'
+
 time_range = (0, 300000)  # ps
 
-for seq_idx in range(5,6):
+for seq_idx in range(1):
     for temp_idx, temp in enumerate(temps):
         # topology
-        pdb = f'/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/' \
-              f'{sequences[seq_idx]}.pdb'
-        # CENTERED (!!) trajectory
-        xtc = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/MetaD/' \
-              f'centered_{temp_idx}.xtc'
-        # xtc = '/Users/joshsmith/Git/ek-conformation-project/analysis/practice_data/EK_300_skip_100.xtc'
+        pdb = op.join(pdb_dir, f'{sequences[seq_idx]}.pdb')
+        # trajectory
+        # xtc = op.join(xtc_dir, f'{sequences[seq_idx]}/MetaD/centered_{temp_idx}.xtc')
+        xtc = op.join(xtc_dir, 'EK_300_skip_100.xtc')
 
         # load low temp traj and restrict frames to time range of interest
         traj = md.load(xtc, top=pdb)
@@ -47,40 +52,31 @@ for seq_idx in range(5,6):
         # load rewieghting bias #
         #########################
         # ct file
-        ct_file = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/' \
-                  f'driver/Reweighting/temp{temp_idx}/COLVARdriver'
-
-        # ct_file = '/Users/joshsmith/Git/ek-conformation-project/analysis/practice_data/EK_300_COLVAR_driver_skip_400'
+        # ct_file = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/' \
+        #           f'driver/Reweighting/temp{temp_idx}/COLVARdriver'
+        ct_file = op.join(plumed_dir, 'EK_300_COLVAR_driver_skip_400')
 
         # Read in colvar for weight
-        ct = read_plumed_file(ct_file, bias_column='metad.rbias')  #, stride=100)
+        ct = read_plumed_file(ct_file, bias_column='metad.rbias')
         ct = ct[traj.time]
 
-        frame_weights = pd.DataFrame(reweight_ct(ct, temp=temps[temp_idx]), index=ct.index)
+        frame_weights = pd.DataFrame(
+            reweight_ct(ct, temp=temps[temp_idx]),
+            index=ct.index
+        )
         frame_weights['norm_wt'] = frame_weights / frame_weights.sum()
 
         ######################
         # calculate contacts #
         ######################
-        # top = traj.topology
-        # # define possible salt bridges
-        # pos_charge_center = top.select("resname LYS and name NZ")
-        # neg_charge_center = top.select("resname GLU and name CD")
-        # bridges = np.array(
-        #     list(itertools.product(pos_charge_center, neg_charge_center))
-        # )
-        # # caluclate distances between charge centers in all frames
-        # charge_dists = pd.DataFrame(
-        #     md.compute_distances(traj, atom_pairs=bridges, periodic=False),
-        #     index=traj.time,
-        # )
-        # # calculate number of salt bridges in eah frame
-        # dist_cutoff = 0.4
-        # is_salt_bridge = (charge_dists < dist_cutoff)
-        # # # weight by normalized frame weight
-        # # avg_num_salt_bridges = sum(
-        # #     frame_weights['norm_wt'] * salt_bridge_mask.sum(axis=1)
-        # # )
+
+        # define possible salt bridges
+        pos_charge_center = "resname LYS and name NZ"
+        neg_charge_center = "resname GLU and name CD"
+
+        is_salt_bridge, atom_pairs = calculate_contacts(
+            traj, pos_charge_center, neg_charge_center, cutoff=0.4
+        )
 
 
         ###########
@@ -143,34 +139,9 @@ for seq_idx in range(5,6):
         # # do dssp #
         # ###########
 
-        structure = pd.DataFrame(
-            md.compute_dssp(traj, simplified=False),
-            index=traj.time,
-        )
-
-        alpha_mask = (structure == "H")  # for fraction, add: .mean(axis=1)
-        alpha_frxn = (alpha_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        bridge_mask = (structure == "B")  # for fraction, add: .mean(axis=1)
-        bridge_frxn = (bridge_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        extended_mask = (structure == "E")  # for fraction, add: .mean(axis=1)
-        extended_frxn = (extended_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        three_ten_mask = (structure == "G")  # for fraction, add: .mean(axis=1)
-        three_ten_frxn = (three_ten_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        pi_mask = (structure == "I")  # for fraction, add: .mean(axis=1)
-        pi_frxn = (pi_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        turn_mask = (structure == "T")  # for fraction, add: .mean(axis=1)
-        turn_frxn = (turn_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        bend_mask = (structure == "S")  # for fraction, add: .mean(axis=1)
-        bend_frxn = (bend_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-
-        coil_mask = (structure == " ")  # for fraction, add: .mean(axis=1)
-        coil_frxn = (coil_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
+        structure_frxn = do_dssp(traj, simplified=False)
+        # get reweighted structure frxn by broadcasting normalized frame weights
+        reweighted_frxn = structure_frxn.multiply(frame_weights['norm_wt'], axis='index')
 
 
         # structure[structure == "H"] = 0.0

@@ -25,7 +25,7 @@ def calculate_contacts(traj, selection, selection2=None, cutoff=0.4):
     )
     # return boolean matrix of contacts in each frame
     contacts = (distances < cutoff)
-    return contacts
+    return contacts, atom_pairs
 
 
 # ##########
@@ -76,3 +76,19 @@ def structure_contact_fraction(traj, contacts, atom_pairs, simplified=True):
     # TODO: instead, loop through structure types and build df to return
     return helix_salt_bridge_frxn, extended_salt_bridge_frxn, coil_salt_bridge_frxn
 
+
+def do_dssp(traj, simplified=True):
+    structure = pd.DataFrame(
+        md.compute_dssp(traj, simplified=simplified),
+        index=traj.time,
+    )
+
+    code_set = frozenset(
+        frozenset(structure[col].unique()) for col in structure.columns
+    )
+    structure_codes = list({code for codes in code_set for code in codes})
+
+    structure_frxn = pd.DataFrame(index=traj.time, columns=structure_codes)
+    for code in structure_frxn.columns:
+        structure_frxn[code] = (structure == code).mean(axis=1)
+    return structure_frxn
