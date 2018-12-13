@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import mdtraj as md
 
+from contacts import calculate_contacts
 
 # ##########
 # do dssp #
