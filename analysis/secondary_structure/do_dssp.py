@@ -1,14 +1,12 @@
-import itertools
 import os.path as op
 import numpy as np
 import pandas as pd
 import mdtraj as md
-import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("..")
 from utilities import read_plumed_file, reweight_ct
-from structure import calculate_contacts, do_dssp
+from structure import do_dssp, structure_contact_fraction
 
 #############
 # load traj #
@@ -66,101 +64,24 @@ for seq_idx in range(1):
         )
         frame_weights['norm_wt'] = frame_weights / frame_weights.sum()
 
-        ######################
-        # calculate contacts #
-        ######################
-
-        # define possible salt bridges
-        pos_charge_center = "resname LYS and name NZ"
-        neg_charge_center = "resname GLU and name CD"
-
-        is_salt_bridge, atom_pairs = calculate_contacts(
-            traj, pos_charge_center, neg_charge_center, cutoff=0.4
-        )
-
-
         ###########
         # do dssp #
         ###########
-        #
-        # structure = pd.DataFrame(
-        #     md.compute_dssp(traj),
-        #     index=traj.time,
-        # )
-        #
-        # helical_mask = (structure == "H")  # for fraction, add: .mean(axis=1)
-        # helix_frxn = (helical_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-        # extended_mask = (structure == "E")  # for fraction, add: .mean(axis=1)
-        # extended_frxn = (extended_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-        # coil_mask = (structure == "C")  # for fraction, add: .mean(axis=1)
-        # coil_frxn = (coil_mask.mean(axis=1) * frame_weights['norm_wt']).sum()
-        # # residue-wise salt bridge + structure
-        # salt_bridge_mask = pd.DataFrame(
-        #     np.zeros_like(structure, dtype=bool),
-        #     index=traj.time,
-        # )
-        # # for each frame, set True where salt bridge occurs
-        # for t in is_salt_bridge.index:
-        #     # TODO: vectorize once i figure out how to slice mdtraj topology
-        #     for atom_idx in bridges[np.where(is_salt_bridge.loc[t, :])]:
-        #         for atom in atom_idx:
-        #             res_id = top.atom(atom).residue.index
-        #             salt_bridge_mask.loc[t, res_id] = True
-        # # find where salt bridge AND given structure is true
-        # helix_and_salt_bridge = (helical_mask * salt_bridge_mask).sum(axis=1)
-        # extended_and_salt_bridge = (extended_mask * salt_bridge_mask).sum(axis=1)
-        # coil_and_salt_bridge = (coil_mask * salt_bridge_mask).sum(axis=1)
-        # # filter to only helical frames and reweight fraction
-        # nonzero_helix_frames = helical_mask.sum(axis=1).nonzero()
-        # helix_salt_bridge_frxn = (
-        #     (
-        #         helix_and_salt_bridge.iloc[nonzero_helix_frames]
-        #         / helical_mask.sum(axis=1).iloc[nonzero_helix_frames]
-        #     ) * frame_weights['norm_wt']
-        # ).sum()
-        #
-        # nonzero_extended_frames = extended_mask.sum(axis=1).nonzero()
-        # extended_salt_bridge_frxn = (
-        #     (
-        #         extended_and_salt_bridge.iloc[nonzero_extended_frames]
-        #         / extended_mask.sum(axis=1).iloc[nonzero_extended_frames]
-        #     ) * frame_weights['norm_wt']
-        # ).sum()
-        #
-        # nonzero_coil_frames = coil_mask.sum(axis=1).nonzero()
-        # coil_salt_bridge_frxn = (
-        #     (
-        #         coil_and_salt_bridge.iloc[nonzero_coil_frames]
-        #         / coil_mask.sum(axis=1).iloc[nonzero_coil_frames]
-        #     ) * frame_weights['norm_wt']
-        # ).sum()
-
-        # ###########
-        # # do dssp #
-        # ###########
-
+        # calculate fraction of each structure type for each frame
         structure_frxn = do_dssp(traj, simplified=False)
         # get reweighted structure frxn by broadcasting normalized frame weights
-        reweighted_frxn = structure_frxn.multiply(frame_weights['norm_wt'], axis='index')
+        reweighted_frxn = structure_frxn.multiply(
+            frame_weights['norm_wt'], axis='index'
+        ).sum()
 
+        # define salt bridge selections
+        pos_charge_center = "resname LYS and name NZ"
+        neg_charge_center = "resname GLU and name CD"
 
-        # structure[structure == "H"] = 0.0
-        # structure[structure == "E"] = 1.0
-        # structure[structure == "C"] = 2.0
-        # structure = np.array(structure, dtype=float)
-        # plt.imshow(structure.T[:, ::500])
-        # plt.show()
-
-        with open(f'full_struct_{sequences[seq_idx]}.txt', mode='a') as f:
-            print(
-                temp,
-                alpha_frxn,
-                three_ten_frxn,
-                pi_frxn,
-                bridge_frxn,
-                extended_frxn,
-                turn_frxn,
-                bend_frxn,
-                coil_frxn,
-                file=f
-            )
+        # in each frame, calculate the fraction of salt-bridging residues of each type
+        structure_sb_frxn = structure_contact_fraction(
+            traj, pos_charge_center, neg_charge_center, cutoff=0.4, simplified=True,
+        )
+        reweighted_ssb_frxn = structure_sb_frxn.multiply(
+            frame_weights['norm_wt'], axis='index'
+        ).sum()
