@@ -1,9 +1,6 @@
-import itertools
 import numpy as np
 import pandas as pd
 import mdtraj as md
-
-import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("..")
@@ -21,9 +18,9 @@ temps = [
     300.000, 311.264, 322.952, 335.078, 347.660, 360.714,
     374.258, 388.311, 402.891, 418.019, 433.715, 450.000
 ]
-temp_idx = 0
+temp_idx = 11
 seq_idx = 0
-pdb = f'/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/{sequences[seq_idx]}.pdb'
+pdb = f'/Users/joshsmith/Git/ek-conformation-project/analysis/clustering/pdb/{sequences[seq_idx]}.pdb'
 xtc = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/MetaD/centered_{temp_idx}.xtc'
 # ct file
 ct_file = f'/Volumes/UntitledUnmastered/EK_proj/{sequences[seq_idx]}/' \
@@ -110,7 +107,8 @@ def gromos(rmsd_matrix, cutoff):
     return clust_ids, central_structures
 
 
-clust_ids, central_structures = gromos(distances, 0.6)
+cutoff = 0.5
+clust_ids, central_structures = gromos(distances, cutoff)
 
 clust_ids = pd.Series(
     clust_ids,
@@ -119,11 +117,14 @@ clust_ids = pd.Series(
 
 frame_weights['clust_id'] = clust_ids
 clust_wts = frame_weights.groupby(['clust_id'])[['norm_wt']].sum()
-top_three = clust_wts.sort_values(['norm_wt'], ascending=False).index[:3]
+top_three = clust_wts.sort_values(['norm_wt'], ascending=False).index[:4]
 
 for clust in top_three:
     frame = central_structures[int(clust)]
     if frame is not None:
-        traj[frame].save_pdb(f'clust{int(clust)}.pdb')
+        print(f'{clust} {clust_wts.loc[clust, "norm_wt"]}')
+        traj[frame].save_pdb(
+            f'{sequences[seq_idx]}_{round(temps[temp_idx])}_clust{int(clust)}.pdb'
+        )
 
-print('lol')
+clust_wts.to_csv(f'{sequences[seq_idx]}_{cutoff}_{round(temps[temp_idx])}.txt')
